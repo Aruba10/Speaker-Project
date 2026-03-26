@@ -1,56 +1,24 @@
-import speech_recognition as sr
-import librosa
-import soundfile as sf
-import os
+from diarization import get_audio_segments
+from asr import convert_speech
+from captioning import generate_caption
 
-# ---------- AUDIO PATH ----------
 audio_path = "audio/test.wav"
 
-print("\n🔊 Processing Audio...\n")
+print("\n🔊 AI Speaker Captioning Running...\n")
 
-# ---------- LOAD AUDIO ----------
-try:
-    y, sr_rate = librosa.load(audio_path, sr=None)
-except Exception as e:
-    print("❌ Error loading audio file:", e)
-    exit()
+segments = get_audio_segments(audio_path)
 
-# ---------- SEGMENT SETTINGS ----------
-segment_duration = 4  # seconds
-samples_per_segment = int(segment_duration * sr_rate)
-
-recognizer = sr.Recognizer()
 speaker_toggle = 1
 
-# ---------- PROCESS EACH SEGMENT ----------
-for start in range(0, len(y), samples_per_segment):
-    end = start + samples_per_segment
+for i, (segment, sr_rate) in enumerate(segments):
+    filename = f"temp_{i}.wav"
 
-    segment_file = f"temp_{start}.wav"
+    text = convert_speech(segment, sr_rate, filename)
 
-    # Save segment
-    sf.write(segment_file, y[start:end], sr_rate)
+    caption = generate_caption(f"Speaker {speaker_toggle}", text)
 
-    try:
-        with sr.AudioFile(segment_file) as source:
-            audio = recognizer.record(source)
+    print(caption)
 
-        text = recognizer.recognize_google(audio)
+    speaker_toggle = 2 if speaker_toggle == 1 else 1
 
-        print(f"Speaker {speaker_toggle}: {text}")
-
-        # Toggle speaker
-        speaker_toggle = 2 if speaker_toggle == 1 else 1
-
-    except sr.UnknownValueError:
-        print(f"Speaker {speaker_toggle}: [Could not understand]")
-
-    except sr.RequestError:
-        print(f"Speaker {speaker_toggle}: [API error]")
-
-    finally:
-        # Delete temp file
-        if os.path.exists(segment_file):
-            os.remove(segment_file)
-
-print("\n✅ Processing Completed!\n")
+print("\n✅ Done\n")
